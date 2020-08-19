@@ -3,20 +3,20 @@ package com.dpancerz.ioc;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 import static java.util.Arrays.stream;
 import static java.util.List.of;
-import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
 class SetterDependencyFinder extends AbstractDependenciesFinder<Method> {
     private final MethodFinder methodFinder;
-    protected SetterDependencyFinder(MapReducer<String, Class<?>> accumulator,
-                                     DependencyInjectionDialect dialect,
-                                     MethodFinder methodFinder) {
-        super(accumulator, dialect);
+    protected SetterDependencyFinder(
+            DependencyInjectionDialect dialect,
+            MethodFinder methodFinder) {
+        super(dialect);
         this.methodFinder = methodFinder;
     }
 
@@ -26,11 +26,16 @@ class SetterDependencyFinder extends AbstractDependenciesFinder<Method> {
     }
 
     @Override
-    protected Map<String, Class<?>> getDependencies(Method method) {
+    protected Set<BeanInfo> getDependencies(Method method) {
         return Optional.of(method)
                 .filter(this::isSetter)
                 .map(this::toBeanNames)
-                .orElseGet(HashMap::new);
+                .orElseGet(HashSet::new);
+    }
+
+    @Override
+    protected DependencyType dependencyType() {
+        return DependencyType.SETTER;
     }
 
     private boolean isSetter(Method method) { //TODO imperfect- return true on e.g. 'settings(sth)'
@@ -38,15 +43,23 @@ class SetterDependencyFinder extends AbstractDependenciesFinder<Method> {
                 && method.getParameterCount() == 1;
     }
 
-    private Map<String, Class<?>> toBeanNames(Method method) {
+    private Set<BeanInfo> toBeanNames(Method method) {
         return stream(method.getDeclaredAnnotations())
                 .filter(super::isDialectAnnotation)
-                .collect(toMap(ann -> extractName(method, ann),
-                        ann -> method.getDeclaringClass()));
+                .map(annotation -> toBeanInfo(annotation, method))
+                .collect(toSet());
+    }
+
+    private BeanInfo toBeanInfo(
+            final Annotation annotation,
+            final Method method) {
+        return new BeanInfo(
+                method.getDeclaringClass(),
+                extractName(method, annotation));
     }
 
     private String extractName(Method method, Annotation ann) {
-        return extractBeanName(method.getDeclaringClass(), of(ann))
+        return extractBeanName(of(ann))
                 .orElseGet(() -> nameFromSetter(method));
     }
 

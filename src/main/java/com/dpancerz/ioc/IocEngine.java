@@ -10,7 +10,8 @@ class IocEngine {
 
     IocEngine(String rootPackage,
               AnnotationProcessor annotationProcessor,
-              ApplicationFactory applicationFactory, DependencyInjectionDialect dialect) {
+              ApplicationFactory applicationFactory,
+              DependencyInjectionDialect dialect) {
         this.rootPackage = rootPackage;
         this.annotationProcessor = annotationProcessor;
         this.applicationFactory = applicationFactory;

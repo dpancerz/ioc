@@ -1,60 +1,64 @@
 package com.dpancerz.ioc;
 
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
+
+import static java.util.Arrays.asList;
+import static java.util.stream.Collectors.toSet;
 
 class SimpleApplicationFactory implements ApplicationFactory {
     private final DirectedManyRelationsGraphFactory graphFactory;
     private final DependencyInjectionDialect dialect;
     private final Collection<AbstractDependenciesFinder<?>> dependenciesFinders; //TODO aggregate to one and call like any other?
-    private final MapReducer<String, Class<?>> accumulator;
 
-    SimpleApplicationFactory(DirectedManyRelationsGraphFactory graphFactory,
-                             DependencyInjectionDialect dialect,
-                             Collection<AbstractDependenciesFinder<?>> dependenciesFinders,
-                             MapReducer<String, Class<?>> accumulator) {
+    SimpleApplicationFactory(
+            DirectedManyRelationsGraphFactory graphFactory,
+            DependencyInjectionDialect dialect,
+            Collection<AbstractDependenciesFinder<?>> dependenciesFinders) {
         this.graphFactory = graphFactory;
         this.dialect = dialect;
         this.dependenciesFinders = dependenciesFinders;
-        this.accumulator = accumulator;
     }
 
     @Override
     public Application createApplication(Set<Class<?>> scannedBeans) {
-        scannedBeans.stream()
-            .map(cls -> Pair.of(cls, dependenciesOf(cls)))
-//                .map(this::findConstructor)
-                ;
-//        findDependencies();
-//        buildDependenciesGraph();//check if cycles, if yes then don't allow both in constructor
-//        createBeans();//consider using proxies
-        Map<BeanInfo, Object> beans = new HashMap<>();
-//        injectBeansByFieldOrSetters();
+        Set<BeanInfo> applicationBeans = scannedBeans.stream()
+                .map(this::toBeanInfo)
+                .collect(toSet());
+        Set<Dependency> allDependencies = applicationBeans.stream()
+                .flatMap(beanInfo -> toDependencies(beanInfo).stream())
+                .collect(toSet());
+        DirectedManyRelationsGraph<BeanInfo, Dependency> dependenciesGraph =
+                toGraph(applicationBeans, allDependencies);
+
         return null;
     }
 
-    private Map<String, Class<?>> dependenciesOf(Class<?> cls) {
+    private DirectedManyRelationsGraph<BeanInfo, Dependency> toGraph(
+            final Set<BeanInfo> scannedBeans,
+            final Set<Dependency> allDependencies) {
+        DirectedManyRelationsGraph<BeanInfo, Dependency> graph =
+                graphFactory.graphWithoutEdges(scannedBeans, Dependency.class);
+        allDependencies.forEach(dependency -> add(dependency, graph));
+        return graph;
+    }
+
+    private void add(
+            final Dependency dependency,
+            final DirectedManyRelationsGraph<BeanInfo, Dependency> graph) {
+        graph.addEdge(dependency.from(), dependency.to(), dependency);
+    }
+
+    private BeanInfo toBeanInfo(final Class<?> aClass) {
+        return new BeanInfo(aClass,
+                            new BeanNameExtractor(asList(aClass.getDeclaredAnnotations()), dialect).extractName()
+                .orElse(aClass.getName()));
+    }
+
+    private Set<Dependency> toDependencies(BeanInfo beanInfo) {
         return dependenciesFinders.stream()
-                .map(finder -> finder.findDependencies(cls))
-                .reduce(accumulator)
-                .orElseGet(HashMap::new);
-//        Map<String, Class<?>> constructorDependencies = findAllConstructors(cls)
-//                .stream()
-//                .map(this::getDependenciesFromConstructor)
-//                .reduce(new MapReducer<>())
-//                .orElseGet(HashMap::new);
-//        Map<String, Class<?>> fieldDependencies = findAllFields(cls)
-//                .stream()
-//                .map(this::getDependenciesFromFields)
-//                .reduce(new MapReducer<>())
-//                .orElseGet(HashMap::new);
-//        Map<String, Class<?>> setterDependencies = findAllSetters(cls)
-//                .stream()
-//                .map(this::getDependenciesFromSetters)
-//                .reduce(new MapReducer<>())
-//                .orElseGet(HashMap::new);
-//        return constructorDependencies;
+                .flatMap(finder -> finder.findDependencies(beanInfo)
+                        .stream())
+                .collect(toSet());
     }
 }

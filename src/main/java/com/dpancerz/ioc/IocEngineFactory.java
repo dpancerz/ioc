@@ -9,9 +9,9 @@ class IocEngineFactory {
 //                        classReflections
                         new GuavaDirectedNetworkFactory(),
                         new JavaxDialect(),
-                        null, null
+                        null
 
-//                        dependenciesFinders,
+                        //                        dependenciesFinders,
 //                        accumulator
                 ),
                 new JavaxDialect()

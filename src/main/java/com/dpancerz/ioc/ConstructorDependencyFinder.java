@@ -4,16 +4,17 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import java.util.stream.IntStream;
 
 import static java.util.Arrays.asList;
 import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
 class ConstructorDependencyFinder extends AbstractDependenciesFinder<Constructor<?>> {
-    protected ConstructorDependencyFinder(MapReducer<String, Class<?>> accumulator,
-                                          DependencyInjectionDialect dialect) {
-        super(accumulator, dialect);
+    protected ConstructorDependencyFinder(
+            DependencyInjectionDialect dialect) {
+        super(dialect);
     }
 
     @Override
@@ -22,21 +23,27 @@ class ConstructorDependencyFinder extends AbstractDependenciesFinder<Constructor
     }
 
     @Override
-    protected Map<String, Class<?>> getDependencies(Constructor<?> constructor) {
+    protected Set<BeanInfo> getDependencies(Constructor<?> constructor) {
         List<Class<?>> parameterTypes = asList(constructor.getParameterTypes());
         List<Annotation[]> annotations = asList(constructor.getParameterAnnotations());
         return IntStream.range(0, parameterTypes.size())
                 .mapToObj(index -> extractBeanData(parameterTypes, annotations, index))
-                .collect(toMap(Pair::getLeft, Pair::getRight));
+                .collect(toSet());
     }
 
-    private Pair<String, ? extends Class<?>> extractBeanData(List<Class<?>> parameterTypes,
-                                                             List<Annotation[]> annotations,
-                                                             int index) {
+    @Override
+    protected DependencyType dependencyType() {
+        return DependencyType.CONSTRUCTOR;
+    }
+
+    private BeanInfo extractBeanData(
+            List<Class<?>> parameterTypes,
+            List<Annotation[]> annotations,
+            int index) {
         Class<?> dependency = parameterTypes.get(index);
         List<Annotation> paramAnnotations = asList(annotations.get(index));
-        String beanName = extractBeanName(dependency, paramAnnotations)
+        String beanName = extractBeanName(paramAnnotations)
                 .orElse(dependency.getName());
-        return Pair.of(beanName, dependency);
+        return new BeanInfo(dependency, beanName);
     }
 }

@@ -1,56 +1,47 @@
 package com.dpancerz.ioc;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Field;
 import java.lang.reflect.Member;
-import java.util.*;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+
+import static java.util.stream.Collectors.toSet;
 
 abstract class AbstractDependenciesFinder<E extends Member> {
-    private final MapReducer<String, Class<?>> accumulator;
     private final DependencyInjectionDialect dialect;
 
-    protected AbstractDependenciesFinder(MapReducer<String, Class<?>> accumulator,
-                                         DependencyInjectionDialect dialect) {
-        this.accumulator = accumulator;
+    protected AbstractDependenciesFinder(
+            DependencyInjectionDialect dialect) {
         this.dialect = dialect;
     }
 
-    public Map<String, Class<?>> findDependencies(Class<?> clazz) {
-        return findAllMembers(clazz)
-                .stream()
-                .map(this::getDependencies)
-                .reduce(accumulator)
-                .orElseGet(HashMap::new);
+    public Set<Dependency> findDependencies(BeanInfo parent) {
+        return findAllMembers(parent.getClazz()).stream()
+                .flatMap(member -> getDependencies(member).stream())
+                .map((BeanInfo bean) -> toDependency(parent, bean))
+                .collect(toSet());
     }
 
-    protected abstract Map<String, Class<?>> getDependencies(E member);
+    protected abstract Set<BeanInfo> getDependencies(E member);
+
+    protected abstract DependencyType dependencyType();
 
     protected abstract Collection<E> findAllMembers(Class<?> clazz);
 
-    protected DependencyInjectionDialect dialect() {
-        return dialect;
-    }
-
-    protected Optional<String> extractBeanName(Class<?> dependency, List<Annotation> paramAnnotations) {
-        return paramAnnotations.stream()
-                .filter(this::isDialectAnnotation)
-                .findAny()
-                .map(this::extractBeanName);
+    protected Optional<String> extractBeanName(
+            List<Annotation> paramAnnotations) {
+        return new BeanNameExtractor(paramAnnotations, dialect).extractName();
     }
 
     protected boolean isDialectAnnotation(Annotation annotation) {
-        return dialect()
-                .injectAnnotations()
-                .contains(annotation.getClass());
+        return new DialectAnnotationPredicate(annotation, dialect).isDialectAnnotation();
     }
 
-    private String extractBeanName(Annotation annotation) {
-        try {
-            Field field = annotation.getClass().getField(dialect().nameParameter());
-            return field.get(annotation).toString();
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            e.printStackTrace();
-            return null;
-        }
+    private Dependency toDependency(
+            final BeanInfo parent,
+            final BeanInfo dependency) {
+        return new Dependency(parent, dependency, dependencyType());
     }
 }

@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FieldFinderTest {
     private FieldFinder fieldFinder;
-    private static final List<String> ALL_FIELDS = asList(
+    private static final List<String> EXPECTED_ALL_FIELDS = asList(
             "publicConcreteField",
             "packageConcreteField",
             "protectedConcreteField",
@@ -36,18 +36,23 @@ class FieldFinderTest {
     );
 
     @BeforeEach
-    public void setUp() {
+    void setUp() {
         fieldFinder = new FieldFinder();
     }
 
     @Test
     void findAllFields() {
-        Collection<Field> extractedFields = fieldFinder.findAllFields(Concrete.class);
+        //given
+        Class<Concrete> clazz = Concrete.class;
+
+        //when
+        Collection<Field> extractedFields = fieldFinder.findAllFields(clazz);
         List<String> extractedAsStrings = extractedFields.stream().map(Field::getName).collect(toList());
 
-        assertEquals(ALL_FIELDS, extractedAsStrings);
-        assertTrue(extractedAsStrings.containsAll(ALL_FIELDS));
-        assertEquals(ALL_FIELDS.size(), extractedFields.size());
+        //then
+        assertEquals(EXPECTED_ALL_FIELDS, extractedAsStrings);
+        assertTrue(extractedAsStrings.containsAll(EXPECTED_ALL_FIELDS));
+        assertEquals(EXPECTED_ALL_FIELDS.size(), extractedFields.size());
     }
 
     public static abstract class Abstract {
